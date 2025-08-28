@@ -1,0 +1,37 @@
+{
+  "name": "anime-prompt-board",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Anime Prompt Board — Electron (no-login, local storage)",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "mac": "electron-builder --mac",
+    "win": "electron-builder --win",
+    "linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "31.3.1",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "com.fschugege.animepromptboard",
+    "productName": "Anime Prompt Board",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json",
+      "README.md"
+    ],
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
+  }
+}
