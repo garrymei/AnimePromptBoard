@@ -32,7 +32,7 @@ function createWindow() {
   console.log('Creating main window...');
   console.log('Preload path:', path.join(__dirname, 'preload.js'));
   console.log('HTML path:', path.join(__dirname, 'renderer', 'index.html'));
-  
+
   win = new BrowserWindow({
     width: 1300, height: 900,
     webPreferences: {
@@ -41,12 +41,12 @@ function createWindow() {
       nodeIntegration: false
     }
   });
-  
+
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  
+
   // 开发时打开开发者工具
   win.webContents.openDevTools();
-  
+
   console.log('Window created successfully');
 }
 
@@ -60,7 +60,7 @@ app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) creat
 
 ipcMain.handle('entries:list', () => readJSON());
 ipcMain.handle('entries:save', (e, entries) => { writeJSON(entries); return {ok:true}; });
-ipcMain.handle('media:saveDataURL', (e, { dataUrl, filenameBase }) => {
+ipcMain.handle('media:saveDataURL', (e, { dataUrl, filenameBase, thumbnail }) => {
   try {
     const root = getDataRoot();
     const mediaDir = path.join(root, 'media');
@@ -68,8 +68,19 @@ ipcMain.handle('media:saveDataURL', (e, { dataUrl, filenameBase }) => {
     const extMatch = /data:image\/(png|jpeg|jpg|webp)/.exec(meta || '');
     const ext = extMatch ? (extMatch[1] === 'jpeg' ? 'jpg' : extMatch[1]) : 'png';
     const file = `${filenameBase}.${ext}`;
+
+    // 保存原图
     fs.writeFileSync(path.join(mediaDir, file), Buffer.from(b64, 'base64'));
-    return { ok: true, path: `media/${file}` };
+
+    // 保存缩略图（如果提供）
+    if (thumbnail) {
+      const thumbsDir = path.join(mediaDir, 'thumbs');
+      const [thumbMeta, thumbB64] = String(thumbnail).split(',');
+      const thumbFile = `${filenameBase}_thumb.${ext}`;
+      fs.writeFileSync(path.join(thumbsDir, thumbFile), Buffer.from(thumbB64, 'base64'));
+    }
+
+    return { ok: true, path: `media/${file}`, thumbnail: thumbnail ? `media/thumbs/${filenameBase}_thumb.${ext}` : null };
   } catch (error) {
     console.error('Save media error:', error);
     return { ok: false, error: error.message };
@@ -80,7 +91,8 @@ ipcMain.handle('open:userData',()=>{const p=app.getPath('userData'); shell.openP
 // 解析媒体文件路径（白名单 media/）
 ipcMain.handle('resolve:mediaURL', (e, relPath) => {
   try {
-    if (!/^media\//.test(relPath)) {
+    // 严格验证路径：只允许 media/ 开头，拒绝 ../
+    if (!/^media\/(thumbs\/)?[^/\\]+\.[a-zA-Z0-9]+$/.test(relPath) || relPath.includes('..')) {
       throw new Error('Invalid media path');
     }
     const abs = path.join(getDataRoot(), relPath);
@@ -101,7 +113,7 @@ ipcMain.handle('export:json', (e, data) => {
         { name: 'All Files', extensions: ['*'] }
       ]
     });
-    
+
     if (result) {
       fs.writeFileSync(result, JSON.stringify(data, null, 2), 'utf-8');
       return { ok: true, path: result };
@@ -123,7 +135,7 @@ ipcMain.handle('import:json', () => {
       ],
       properties: ['openFile']
     });
-    
+
     if (result && result[0]) {
       const data = fs.readFileSync(result[0], 'utf-8');
       const parsed = JSON.parse(data);

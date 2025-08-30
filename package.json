@@ -9,11 +9,20 @@
     "start": "electron .",
     "mac": "electron-builder --mac",
     "win": "electron-builder --win",
-    "linux": "electron-builder --linux"
+    "linux": "electron-builder --linux",
+    "lint": "eslint . --fix",
+    "lint:check": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@eslint/js": "^9.34.0",
     "electron": "31.3.1",
-    "electron-builder": "24.13.3"
+    "electron-builder": "24.13.3",
+    "eslint": "^9.34.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.6.2"
   },
   "build": {
     "appId": "com.fschugege.animepromptboard",

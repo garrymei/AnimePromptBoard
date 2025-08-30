@@ -33,6 +33,7 @@ export function setDataRoot(root) {
 export function ensureDataDirs(root) {
   fs.mkdirSync(path.join(root, 'data'), { recursive: true });
   fs.mkdirSync(path.join(root, 'media'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'media', 'thumbs'), { recursive: true });
 }
 
 export function getDBPath(root) {

@@ -225,43 +225,7 @@
             transform: scale(1.02);
         }
 
-        .gallery-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(transparent, rgba(0,0,0,0.7));
-            color: white;
-            padding: 20px 15px 15px;
-            transform: translateY(100%);
-            transition: transform 0.3s ease;
-        }
-
-        .gallery-card:hover .gallery-overlay {
-            transform: translateY(0);
-        }
-
-        .gallery-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            line-height: 1.3;
-        }
-
-        .gallery-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 5px;
-        }
-
-        .tag-chip {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            backdrop-filter: blur(10px);
-        }
+        /* 简化列表卡片，移除overlay，只显示图片 */
 
         /* Empty State */
         .empty-state {
@@ -872,7 +836,7 @@
                     <button class="btn btn-danger" onclick="deleteEntry()">🗑️ 删除</button>
                 </div>
                 <div class="action-group">
-                    <button class="btn btn-secondary" onclick="copyAllPrompts()">📋 复制全部英文</button>
+                    <button class="btn btn-success" onclick="copyAllPrompts()" style="font-size: 16px; font-weight: 600;">📋 复制全部英文提示词</button>
                     <button class="btn btn-primary" onclick="saveEntry()">💾 保存</button>
                 </div>
             </div>
@@ -914,17 +878,35 @@
                 </div>
                 
                 <div style="margin-bottom: 15px;">
-                    <label for="uploadPrompts">提示词文本:</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label for="uploadPrompts">提示词文本:</label>
+                        <div>
+                            <button type="button" class="btn btn-secondary" onclick="fillSampleText()" style="font-size: 12px; padding: 4px 8px; margin-right: 4px;">📝 完整示例</button>
+                            <button type="button" class="btn btn-secondary" onclick="fillIncompleteText()" style="font-size: 12px; padding: 4px 8px; margin-right: 4px; background: #ffc107; color: #212529;">⚠️ 不完整示例</button>
+                            <button type="button" class="btn btn-primary" onclick="previewPromptParsing()" style="font-size: 12px; padding: 4px 8px; background: #17a2b8; border-color: #17a2b8;">🔍 预览解析</button>
+                        </div>
+                    </div>
                     <textarea id="uploadPrompts" rows="10" style="width: 100%; padding: 10px; border: 2px solid #e9ecef; border-radius: 6px;" placeholder="粘贴包含8大类别的提示词文本...
 
 示例格式:
 [Base Styles/基础风格]
 anime, 1girl, beautiful, detailed
 
-[Art Styles/艺术风格]  
+[Artistic Styles/艺术风格]  
 digital art, illustration, masterpiece
 
 ..."></textarea>
+                    
+                    <!-- 解析预览区域 -->
+                    <div id="parsePreview" style="margin-top: 10px; display: none;">
+                        <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 15px;">
+                            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                                <span style="font-weight: bold; margin-right: 10px;">📋 解析预览</span>
+                                <span id="parseStatus" style="font-size: 12px;"></span>
+                            </div>
+                            <div id="parseResults" style="max-height: 200px; overflow-y: auto;"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div style="text-align: right;">
@@ -959,7 +941,18 @@ digital art, illustration, masterpiece
                 zhName: '艺术风格'
             },
             'cinematic': {
-                patterns: [/\[Cinematography?\s*\/?\s*(?:镜头语言|摄影感)?\]/, /\[(?:镜头语言|摄影感)\s*\/?\s*Cinematography?\]/, /\[Cinematic\s*\/?\s*(?:镜头语言|摄影感)?\]/, /\[(?:镜头语言|摄影感)\s*\/?\s*Cinematic\]/],
+                patterns: [
+                    /\[Cinematography?\s*\/?\s*镜头语言?\]/, 
+                    /\[镜头语言\s*\/?\s*Cinematography?\]/, 
+                    /\[Cinematography?\s*\/?\s*摄影感?\]/, 
+                    /\[摄影感\s*\/?\s*Cinematography?\]/, 
+                    /\[Cinematic\s*\/?\s*镜头语言?\]/, 
+                    /\[镜头语言\s*\/?\s*Cinematic\]/,
+                    /\[Cinematic\s*\/?\s*摄影感?\]/, 
+                    /\[摄影感\s*\/?\s*Cinematic\]/,
+                    /\[Cinematic\s*\/\s*摄影感\]/,
+                    /\[摄影感\s*\/\s*Cinematic\]/
+                ],
                 key: 'cinematic',
                 name: '🎬 镜头语言 (Cinematic)', 
                 zhName: '镜头语言'
@@ -977,13 +970,23 @@ digital art, illustration, masterpiece
                 zhName: '主题风格'
             },
             'rendering': {
-                patterns: [/\[Rendering\s*\/?\s*渲染?\]/, /\[渲染\s*\/?\s*Rendering\]/, /\[渲染技术\s*\/?\s*Rendering\]/],
+                patterns: [
+                    /\[Rendering\s*\/?\s*渲染技?术?\]/, 
+                    /\[渲染技?术?\s*\/?\s*Rendering\]/, 
+                    /\[Rendering\s*\/\s*渲染技术\]/,
+                    /\[渲染技术\s*\/\s*Rendering\]/
+                ],
                 key: 'rendering',
                 name: '🖥️ 渲染技术 (Rendering)',
                 zhName: '渲染技术'
             },
             'effects': {
-                patterns: [/\[Effects?\s*\/?\s*特效?\]/, /\[特效\s*\/?\s*Effects?\]/, /\[特效元素\s*\/?\s*Effects?\]/],
+                patterns: [
+                    /\[Effects?\s*\/?\s*特效元?素?\]/, 
+                    /\[特效元?素?\s*\/?\s*Effects?\]/, 
+                    /\[Effects\s*\/\s*特效元素\]/,
+                    /\[特效元素\s*\/\s*Effects\]/
+                ],
                 key: 'effects',
                 name: '✨ 特效元素 (Effects)',
                 zhName: '特效元素'
@@ -1092,6 +1095,38 @@ digital art, illustration, masterpiece
             if (btnChooseRoot) {
                 btnChooseRoot.addEventListener('click', chooseDataRoot);
             }
+
+            // 快捷键支持
+            document.addEventListener('keydown', function(e) {
+                // Esc 关闭详情模态框
+                if (e.key === 'Escape') {
+                    const detailModal = document.getElementById('detailModal');
+                    const uploadModal = document.getElementById('uploadModal');
+                    if (detailModal.classList.contains('active')) {
+                        closeDetailModal();
+                    } else if (uploadModal.classList.contains('active')) {
+                        closeUploadModal();
+                    }
+                }
+                
+                // Ctrl/Cmd + F 聚焦搜索框
+                if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                    e.preventDefault();
+                    const searchInput = document.getElementById('searchInput');
+                    if (searchInput) {
+                        searchInput.focus();
+                        searchInput.select();
+                    }
+                }
+                
+                // Enter 在详情模态框中触发复制全部
+                if (e.key === 'Enter' && document.getElementById('detailModal').classList.contains('active')) {
+                    if (!e.target.matches('textarea, input')) {
+                        e.preventDefault();
+                        copyAllPrompts();
+                    }
+                }
+            });
         }
 
         // 全局拖拽设置
@@ -1132,6 +1167,13 @@ digital art, illustration, masterpiece
                     );
                     
                     if (files.length > 0) {
+                        // 检查重复文件
+                        const duplicateFiles = files.filter(file => checkDuplicateFile(file));
+                        if (duplicateFiles.length > 0) {
+                            const fileNames = duplicateFiles.map(f => f.name).join(', ');
+                            showMessage(`检测到重复文件：${fileNames}`, 'warning');
+                        }
+                        
                         // 自动打开上传模态框并设置文件
                         selectedFiles = files;
                         showUploadModal();
@@ -1143,6 +1185,7 @@ digital art, illustration, masterpiece
                             <div>
                                 <strong>已选择 ${files.length} 个图片文件</strong><br>
                                 <small>${fileNames}</small>
+                                ${duplicateFiles.length > 0 ? `<br><small style="color: orange;">⚠️ 其中 ${duplicateFiles.length} 个文件可能重复</small>` : ''}
                             </div>
                         `;
                         
@@ -1249,8 +1292,9 @@ digital art, illustration, masterpiece
             importBtn.disabled = !(title && prompts && hasFiles);
         }
 
-        // 解析提示词文本
+        // 解析提示词文本 - 改进版，更好支持标准格式
         function parsePromptText(text) {
+            console.log('解析原始文本:', text);
             const result = {};
             
             // 为每个类别初始化空结构
@@ -1276,6 +1320,7 @@ digital art, illustration, masterpiece
                     for (const pattern of mapping.patterns) {
                         if (pattern.test(line)) {
                             foundCategory = key;
+                            console.log(`找到类别 ${key}:`, line);
                             break;
                         }
                     }
@@ -1288,8 +1333,9 @@ digital art, illustration, masterpiece
                         let content = currentContent.join(', ');
                         content = cleanNestedCategories(content);
                         if (content.trim()) {
-                            // 智能分配内容到合适的类别
-                            redistributeContentByKeywords(content, result);
+                            // 直接分配到当前类别，不再智能重分配
+                            result[currentCategory].en = content;
+                            console.log(`分配到 ${currentCategory}:`, content);
                         }
                     }
                     
@@ -1307,10 +1353,12 @@ digital art, illustration, masterpiece
                 let content = currentContent.join(', ');
                 content = cleanNestedCategories(content);
                 if (content.trim()) {
-                    redistributeContentByKeywords(content, result);
+                    result[currentCategory].en = content;
+                    console.log(`分配到 ${currentCategory}:`, content);
                 }
             }
             
+            console.log('解析结果:', result);
             return result;
         }
 
@@ -1499,6 +1547,17 @@ digital art, illustration, masterpiece
             return cleaned;
         }
 
+        // 检查文件是否重复
+        function checkDuplicateFile(file) {
+            const fileKey = `${file.name}_${file.size}`;
+            return entries.some(entry => {
+                if (entry.fileKey === fileKey) {
+                    return true;
+                }
+                return false;
+            });
+        }
+
         // 导入条目
         async function importEntry() {
             if (selectedFiles.length === 0) {
@@ -1517,20 +1576,63 @@ digital art, illustration, masterpiece
             try {
                 console.log('开始导入，文件数量:', selectedFiles.length);
                 
+                // 预校验提示词内容
+                const promptText = document.getElementById('uploadPrompts').value.trim();
+                const prompts = parsePromptText(promptText);
+                const validationResult = validatePrompts(prompts);
+                
+                if (!validationResult.isValid) {
+                    if (validationResult.isEmpty) {
+                        // 全部为空，直接拒绝导入
+                        handleError(new Error('提示词解析失败：未能识别任何有效的提示词内容。请检查文本格式是否正确，确保包含正确的类别标题。'), '提示词解析');
+                        return;
+                    } else if (validationResult.missingCategories.length > 0) {
+                        // 有缺失类别，询问用户是否继续
+                        const missingList = validationResult.missingCategories
+                            .map(key => categoryMapping[key]?.name || key)
+                            .join('、');
+                        const shouldContinue = confirm(`缺少以下类别的提示词：\n\n${missingList}\n\n这将导致 ${selectedFiles.length} 个文件的对应类别为空。\n\n是否仍要继续导入？`);
+                        if (!shouldContinue) {
+                            console.log('用户取消导入：提示词缺失');
+                            return;
+                        }
+                    }
+                }
+                
+                // 检查重复文件
+                const duplicateFiles = selectedFiles.filter(file => checkDuplicateFile(file));
+                if (duplicateFiles.length > 0) {
+                    const fileNames = duplicateFiles.map(f => f.name).join(', ');
+                    const shouldContinue = confirm(`检测到重复文件：${fileNames}\n\n是否继续导入并创建副本？`);
+                    if (!shouldContinue) {
+                        return;
+                    }
+                }
+                
                 for (const file of selectedFiles) {
                     console.log('处理文件:', file.name);
                     
-                    // 转换图片为DataURL
-                    const dataUrl = await fileToDataURL(file);
-                    console.log('DataURL length:', dataUrl.length);
+                    try {
+                        // 验证文件
+                        validateFileType(file);
+                        validateFileSize(file);
+                        
+                        // 转换图片为DataURL
+                        const dataUrl = await fileToDataURL(file);
+                        console.log('DataURL length:', dataUrl.length);
+                        
+                        // 生成缩略图
+                        const thumbnail = await generateThumbnail(dataUrl);
+                        console.log('Thumbnail generated, length:', thumbnail.length);
                     
-                    // 保存图片
+                    // 保存图片和缩略图
                     const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                     console.log('保存图片，文件名:', filename);
                     
                     const saveResult = await window.api.saveMediaDataURL({
                         dataUrl: dataUrl,
-                        filenameBase: filename
+                        filenameBase: filename,
+                        thumbnail: thumbnail
                     });
                     
                     console.log('图片保存结果:', saveResult);
@@ -1539,7 +1641,7 @@ digital art, illustration, masterpiece
                         throw new Error(`图片保存失败: ${saveResult.error}`);
                     }
 
-                    // 解析提示词
+                    // 解析提示词（已经在批量处理开始时校验过了）
                     const prompts = parsePromptText(promptText);
                     console.log('解析的提示词:', prompts);
 
@@ -1548,13 +1650,20 @@ digital art, illustration, masterpiece
                         id: Date.now() + Math.random(),
                         title: title,
                         imagePath: saveResult.path,
+                        thumbnailPath: saveResult.thumbnail,
                         prompts: prompts,
                         tags: [...uploadTags], // 使用上传时添加的标签
+                        fileKey: `${file.name}_${file.size}`, // 用于重复检测
                         createdAt: new Date().toISOString()
                     };
 
-                    entries.push(entry);
-                    console.log('添加条目完成，当前总数:', entries.length);
+                        entries.push(entry);
+                        console.log('添加条目完成，当前总数:', entries.length);
+                    } catch (fileError) {
+                        console.error(`处理文件 ${file.name} 失败:`, fileError);
+                        handleError(fileError, `处理文件 ${file.name}`);
+                        continue; // 继续处理下一个文件
+                    }
                 }
 
                 // 保存到文件并更新显示
@@ -1567,7 +1676,7 @@ digital art, illustration, masterpiece
 
             } catch (error) {
                 console.error('导入失败:', error);
-                showMessage(`导入失败: ${error.message}`);
+                handleError(error, '批量导入');
             }
         }
 
@@ -1656,6 +1765,20 @@ digital art, illustration, masterpiece
             }
         }
 
+        // 防抖保存 - 避免频繁写磁盘
+        let saveTimeout;
+        async function saveEntriesDebounced(delay = 500) {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(async () => {
+                try {
+                    await window.api.saveEntries(entries);
+                    console.log('Entries saved (debounced)');
+                } catch (error) {
+                    console.error('Failed to save entries:', error);
+                }
+            }, delay);
+        }
+
         async function saveEntries() {
             try {
                 await window.api.saveEntries(entries);
@@ -1696,26 +1819,25 @@ digital art, illustration, masterpiece
             const endIndex = startIndex + itemsPerPage;
             const pageEntries = filteredEntries.slice(startIndex, endIndex);
             
-            // 异步解析图片路径
+            // 异步解析图片路径（优先使用缩略图）
             const cardsHTML = await Promise.all(pageEntries.map(async entry => {
-                const imageSrc = await resolveImagePath(entry.imagePath);
+                const thumbPath = entry.thumbnailPath || entry.imagePath;
+                const imageSrc = await resolveImagePath(thumbPath);
                 return `
                     <div class="gallery-card" onclick="showDetailModal('${entry.id}')">
                         <div class="gallery-image-container">
-                            <img class="gallery-image" src="${imageSrc}" alt="${escapeHtml(entry.title)}" />
-                        </div>
-                        <div class="gallery-overlay">
-                            <div class="gallery-title">${escapeHtml(entry.title)}</div>
-                            <div class="gallery-tags">
-                                ${entry.tags.slice(0, 3).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}
-                                ${entry.tags.length > 3 ? `<span class="tag-chip">+${entry.tags.length - 3}</span>` : ''}
-                            </div>
+                            <img class="gallery-image" src="${imageSrc}" alt="${escapeHtml(entry.title)}" loading="lazy" />
                         </div>
                     </div>
                 `;
             }));
             
             grid.innerHTML = cardsHTML.join('');
+            
+            // 为所有图片添加错误处理
+            grid.querySelectorAll('img').forEach(img => {
+                handleImageError(img);
+            });
         }
 
         function updatePagination() {
@@ -1794,6 +1916,11 @@ digital art, illustration, masterpiece
         function closeUploadModal() {
             document.getElementById('uploadModal').classList.remove('active');
             clearUploadForm();
+            // 隐藏解析预览
+            const previewDiv = document.getElementById('parsePreview');
+            if (previewDiv) {
+                previewDiv.style.display = 'none';
+            }
         }
 
         async function showDetailModal(entryId) {
@@ -1866,7 +1993,7 @@ digital art, illustration, masterpiece
                                 <textarea class="prompt-textarea zh" data-category="${key}" data-lang="zh" placeholder="暂无中文解释，可手动补充">${escapeHtml(prompt.zh)}</textarea>
                             </div>
                             <div class="prompt-actions">
-                                <button class="copy-category-btn" onclick="copyCategoryPrompt('${key}')">📋 复制英文</button>
+                                <button class="copy-category-btn" onclick="copyCategoryPrompt('${key}')" style="background: #007bff;">📋 复制此类</button>
                                 <button class="copy-category-btn" onclick="translateCategory('${key}')" style="background: #28a745; margin-left: 8px;">🌏 翻译</button>
                             </div>
                         </div>
@@ -1981,7 +2108,7 @@ digital art, illustration, masterpiece
             });
             
             filteredEntries = [...entries];  // 重要：同步过滤数组
-            saveEntries();
+            saveEntriesDebounced();
             await updateDisplay();
             closeDetailModal();
             showMessage('条目已保存！');
@@ -1993,7 +2120,7 @@ digital art, illustration, masterpiece
             if (confirm('确定要删除这个条目吗？此操作不可撤销。')) {
                 entries = entries.filter(e => e.id !== currentEditingEntry.id);
                 filteredEntries = [...entries];  // 重要：同步过滤数组
-                saveEntries();
+                saveEntriesDebounced();
                 await updateDisplay();
                 closeDetailModal();
                 showMessage('条目已删除！');
@@ -2153,6 +2280,38 @@ digital art, illustration, masterpiece
             });
         }
 
+        // 生成缩略图
+        function generateThumbnail(dataUrl, maxSize = 512) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // 计算缩略图尺寸，保持宽高比
+                    let { width, height } = img;
+                    if (width > height) {
+                        if (width > maxSize) {
+                            height = height * (maxSize / width);
+                            width = maxSize;
+                        }
+                    } else {
+                        if (height > maxSize) {
+                            width = width * (maxSize / height);
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    resolve(canvas.toDataURL('image/jpeg', 0.8));
+                };
+                img.src = dataUrl;
+            });
+        }
+
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
@@ -2171,15 +2330,140 @@ digital art, illustration, masterpiece
             return div.innerHTML;
         }
 
-        function showMessage(message) {
+        // 增强的消息提示系统
+        function showMessage(message, type = 'success') {
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'success-message';
-            messageDiv.textContent = message;
-            document.querySelector('.container').insertBefore(messageDiv, document.querySelector('.toolbar'));
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 8px;
+                color: white;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                font-size: 14px;
+                max-width: 300px;
+                word-wrap: break-word;
+                background: ${type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#dc3545'};
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            `;
+            
+            const icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '❌';
+            messageDiv.innerHTML = `<span style="font-size: 16px;">${icon}</span><span>${message}</span>`;
+            document.body.appendChild(messageDiv);
             
             setTimeout(() => {
                 messageDiv.remove();
-            }, 3000);
+            }, type === 'error' ? 5000 : 3000);
+        }
+
+        // 错误处理函数
+        function handleError(error, context = '操作') {
+            console.error(`${context} 错误:`, error);
+            
+            let userMessage = '';
+            
+            if (error.message?.includes('Failed to fetch')) {
+                userMessage = `${context}失败：网络连接异常，请检查网络后重试`;
+            } else if (error.message?.includes('ENOENT')) {
+                userMessage = `${context}失败：文件不存在或已被删除`;
+            } else if (error.message?.includes('EACCES')) {
+                userMessage = `${context}失败：没有文件访问权限，请检查文件夹权限`;
+            } else if (error.message?.includes('ENOSPC')) {
+                userMessage = `${context}失败：磁盘空间不足，请清理后重试`;
+            } else if (error.message?.includes('Invalid media path')) {
+                userMessage = `${context}失败：图片路径无效，可能文件已被移动或删除`;
+            } else if (error.message?.includes('JSON')) {
+                userMessage = `${context}失败：数据格式错误，请检查文件内容`;
+            } else {
+                userMessage = `${context}失败：${error.message || '未知错误'}`;
+            }
+            
+            showMessage(userMessage, 'error');
+        }
+
+        // 验证文件类型
+        function validateFileType(file) {
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+            if (!file || !file.type) {
+                throw new Error('文件类型无效');
+            }
+            if (!allowedTypes.includes(file.type)) {
+                throw new Error(`不支持的文件类型：${file.type}。支持的格式：JPG, PNG, WebP`);
+            }
+            return true;
+        }
+
+        // 验证文件大小
+        function validateFileSize(file, maxSize = 10 * 1024 * 1024) { // 默认10MB
+            if (!file) {
+                throw new Error('文件不存在');
+            }
+            if (file.size > maxSize) {
+                throw new Error(`文件太大：${(file.size / 1024 / 1024).toFixed(1)}MB。最大允许：${(maxSize / 1024 / 1024).toFixed(1)}MB`);
+            }
+            return true;
+        }
+
+        // 图片加载错误处理
+        function handleImageError(img) {
+            img.onerror = () => {
+                // 显示占位图
+                img.src = `data:image/svg+xml;base64,${btoa(`
+                    <svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="100%" height="100%" fill="#f8f9fa" stroke="#dee2e6"/>
+                        <text x="50%" y="50%" font-family="Arial" font-size="14" fill="#6c757d" text-anchor="middle" dy=".3em">图片加载失败</text>
+                    </svg>
+                `)}`;
+                img.title = '图片加载失败';
+            };
+        }
+
+        // 校验提示词解析结果
+        function validatePrompts(prompts) {
+            const result = {
+                isValid: true,
+                isEmpty: false,
+                missingCategories: [],
+                hasContent: false
+            };
+
+            // 检查是否有任何有效内容
+            let totalContentLength = 0;
+            const missingCategories = [];
+            
+            Object.keys(categoryMapping).forEach(key => {
+                const prompt = prompts[key];
+                if (prompt && prompt.en && prompt.en.trim()) {
+                    totalContentLength += prompt.en.trim().length;
+                    result.hasContent = true;
+                } else {
+                    missingCategories.push(key);
+                }
+            });
+
+            // 判断是否完全为空
+            if (totalContentLength === 0) {
+                result.isEmpty = true;
+                result.isValid = false;
+            }
+            // 判断是否有缺失类别（但不是全空）
+            else if (missingCategories.length > 0) {
+                result.missingCategories = missingCategories;
+                result.isValid = false; // 需要用户确认
+            }
+
+            console.log('提示词校验结果:', {
+                totalContentLength,
+                missingCount: missingCategories.length,
+                result
+            });
+
+            return result;
         }
 
         // 测试模板解析的函数
@@ -2223,6 +2507,171 @@ calligraphic kanji overlay, dissolving brushstroke text, flowing mist captions`;
 
         // 在控制台暴露测试函数
         window.testTemplateParsingInConsole = testTemplateParsingInConsole;
+        window.fillIncompleteText = fillIncompleteText;
+        window.validatePrompts = validatePrompts;
+
+        // 测试用户提供的模板
+        function testUserTemplate() {
+            const userTemplate = `[Base Styles / 基础风格]
+anime style, bishoujo character, elegant silhouette, seductive demoness
+
+[Artistic Styles / 画风表现]
+cel shading, manga lineart, dark gothic tone, vibrant crimson palette
+
+[Cinematic / 摄影感]
+cinematic composition, dynamic portrait close-up, ultra-realistic rim lighting, dramatic angle
+
+[Lighting & Mood / 光影氛围]
+glowing scarlet light, soft bloom effect, sinister moonlit atmosphere, high-contrast shadows
+
+[Theme Styles / 主题风格]
+fantasy Japanese setting, demonic courtesan aesthetic, supernatural blood ritual, cursed jewelry & ornaments
+
+[Rendering / 渲染技术]
+hyper-detailed, 8K resolution, subsurface scattering for skin, painterly brushstroke texture, realistic blood splatter effects
+
+[Effects / 特效元素]
+floating blood mist, glowing ruby gems, dark smoke aura, fiery energy ribbons
+
+[Typography & Overlay / 文字与装饰]
+calligraphic kanji overlay, dissolving brushstroke text, crimson ink captions, flowing curse symbols`;
+
+            console.log('=== 测试用户模板 ===');
+            const result = parsePromptText(userTemplate);
+            console.log('解析结果:', result);
+            
+            Object.keys(categoryMapping).forEach(key => {
+                const mapping = categoryMapping[key];
+                const content = result[key];
+                const status = content.en ? '✅' : '❌';
+                console.log(`${status} ${mapping.name}: ${content.en || '未识别'}`);
+            });
+
+            // 校验结果
+            const validation = validatePrompts(result);
+            console.log('校验结果:', validation);
+            
+            return result;
+        }
+        
+        window.testUserTemplate = testUserTemplate;
+
+        // 预览提示词解析结果
+        function previewPromptParsing() {
+            const promptText = document.getElementById('uploadPrompts').value.trim();
+            const previewDiv = document.getElementById('parsePreview');
+            const statusSpan = document.getElementById('parseStatus');
+            const resultsDiv = document.getElementById('parseResults');
+            
+            if (!promptText) {
+                showMessage('请先输入提示词文本！', 'warning');
+                return;
+            }
+            
+            // 解析提示词
+            console.log('预览解析提示词...');
+            const prompts = parsePromptText(promptText);
+            const validation = validatePrompts(prompts);
+            
+            // 显示预览区域
+            previewDiv.style.display = 'block';
+            
+            // 设置状态
+            if (validation.isEmpty) {
+                statusSpan.innerHTML = '<span style="color: #dc3545;">❌ 解析失败：未识别到任何有效内容</span>';
+            } else if (validation.missingCategories.length > 0) {
+                const missingCount = validation.missingCategories.length;
+                statusSpan.innerHTML = `<span style="color: #ffc107;">⚠️ 部分缺失：识别到 ${8 - missingCount}/8 个类别</span>`;
+            } else {
+                statusSpan.innerHTML = '<span style="color: #28a745;">✅ 完整：识别到全部 8/8 个类别</span>';
+            }
+            
+            // 生成结果HTML
+            let resultsHTML = '';
+            Object.keys(categoryMapping).forEach(key => {
+                const mapping = categoryMapping[key];
+                const prompt = prompts[key];
+                const hasContent = prompt && prompt.en && prompt.en.trim();
+                const statusIcon = hasContent ? '✅' : '❌';
+                const statusColor = hasContent ? '#28a745' : '#dc3545';
+                const content = hasContent ? prompt.en : '未识别';
+                const contentPreview = hasContent && content.length > 60 ? content.substring(0, 60) + '...' : content;
+                
+                resultsHTML += `
+                    <div style="margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px; border-left: 4px solid ${statusColor};">
+                        <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                            <span style="margin-right: 8px;">${statusIcon}</span>
+                            <strong style="color: ${statusColor};">${mapping.name}</strong>
+                        </div>
+                        <div style="font-size: 12px; color: #6c757d; font-family: monospace; word-break: break-all;">
+                            ${escapeHtml(contentPreview)}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = resultsHTML;
+            
+            // 滚动到预览区域
+            previewDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // 检查导入按钮状态
+            checkImportReady();
+            
+            console.log('解析预览完成:', { validation, prompts });
+        }
+
+        // 暴露函数到全局
+        window.previewPromptParsing = previewPromptParsing;
+
+        // 填入示例文本用于测试解析器
+        function fillSampleText() {
+            const sampleText = `[Base Styles / 基础风格]
+anime style, bishoujo character, elegant silhouette
+
+[Artistic Styles / 艺术风格]
+cel shading, manga lineart, vibrant pastel tones
+
+[Cinematic / 镜头语言]
+cinematic composition, dynamic action shot, ultra-realistic rim lighting
+
+[Lighting & Mood / 光影氛围]
+glowing pastel light, soft bloom effect, moonlit atmosphere
+
+[Theme Styles / 主题风格]
+fantasy Japanese setting, traditional haori fluttering, supernatural battle theme
+
+[Rendering / 渲染技术]
+hyper-detailed, 8K resolution, subsurface scattering for skin
+
+[Effects / 特效元素]
+floating cherry blossoms, glowing energy ribbons, heart-shaped sparks
+
+[Typography & Overlay / 文字与装饰]
+calligraphic kanji overlay, dissolving brushstroke text, flowing mist captions`;
+
+            document.getElementById('uploadPrompts').value = sampleText;
+            checkImportReady();
+        }
+
+        // 填入不完整示例（用于测试校验功能）
+        function fillIncompleteText() {
+            const incompleteText = `[Base Styles / 基础风格]
+anime style, bishoujo character, elegant silhouette
+
+[Artistic Styles / 艺术风格]
+cel shading, manga lineart, vibrant pastel tones
+
+[Cinematic / 镜头语言]
+cinematic composition, dynamic action shot
+
+[Lighting & Mood / 光影氛围]
+glowing pastel light, soft bloom effect`;
+            // 缺少后4个类别
+
+            document.getElementById('uploadPrompts').value = incompleteText;
+            checkImportReady();
+        }
 
         // 数据目录管理功能
         async function refreshRoot() {
