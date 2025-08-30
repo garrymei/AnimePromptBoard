@@ -125,6 +125,29 @@ Anime Prompt Board/
     └── img_xxx.png
 ```
 
+## 📁 选择数据目录（推荐 Google Drive）
+
+### 默认使用
+第一次安装可直接使用默认目录（userData），无需额外配置。
+
+### 多设备共享设置
+若要在多设备间共享数据，可设置自定义数据目录：
+
+1. **选择云盘目录**：
+   - 点击界面上的"选择数据目录"按钮
+   - 选择你的 Google Drive 同步文件夹（例如 `G:\AnimePromptBoard`）
+   - 也可选择其他云盘服务的同步目录
+
+2. **数据同步机制**：
+   - `entries.json` 内仅保存相对路径（如 `media/xxx.jpg`）
+   - 不同设备的绝对路径无关，确保跨平台兼容
+   - 所有图片和数据文件都会保存到选定的目录
+
+3. **⚠️ 注意事项**：
+   - **避免多机同时编辑**，防止同步冲突导致数据丢失
+   - 建议在一台设备上完成编辑后，等待云盘同步完成再在其他设备使用
+   - 首次设置后建议重启应用以确保所有功能正常工作
+
 ## 🔧 技术架构
 
 - **主进程** (`main.js`): Electron 主进程，处理文件系统、IPC 通信
@@ -139,6 +162,9 @@ Anime Prompt Board/
 - `export:json` - 导出 JSON 数据
 - `import:json` - 导入 JSON 数据
 - `open:userData` - 打开数据目录
+- `settings:get` - 获取应用设置
+- `settings:setDataRoot` - 设置数据根目录
+- `dialog:chooseDir` - 打开目录选择对话框
 
 ## 🤝 贡献
 

@@ -2,33 +2,30 @@ import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import {
+  getDataRoot, setDataRoot, ensureDataDirs, getDBPath, ensureDBInitialized
+} from './dataRoot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let win;
 
-function ensureDirs() {
-  const base = app.getPath('userData');
-  fs.mkdirSync(path.join(base, 'data'), { recursive: true });
-  fs.mkdirSync(path.join(base, 'media'), { recursive: true });
-  return base;
-}
-
-function getDBPath() {
-  const base = app.getPath('userData');
-  return path.join(base, 'data', 'entries.json');
+function atomicWrite(filePath, data) {
+  const tmp = filePath + '.tmp';
+  fs.writeFileSync(tmp, data, 'utf-8');
+  fs.renameSync(tmp, filePath);
 }
 
 function readJSON() {
-  const p = getDBPath();
+  const p = getDBPath(getDataRoot());
   try { return JSON.parse(fs.readFileSync(p, 'utf-8')); }
   catch { return []; }
 }
 
 function writeJSON(data) {
-  const p = getDBPath();
-  fs.writeFileSync(p, JSON.stringify(data, null, 2), 'utf-8');
+  const p = getDBPath(getDataRoot());
+  atomicWrite(p, JSON.stringify(data, null, 2));
 }
 
 function createWindow() {
@@ -38,10 +35,10 @@ function createWindow() {
   
   win = new BrowserWindow({
     width: 1300, height: 900,
-    webPreferences: { 
-      preload: path.join(__dirname, 'preload.js'), 
-      contextIsolation: true, 
-      nodeIntegration: false 
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
     }
   });
   
@@ -53,39 +50,41 @@ function createWindow() {
   console.log('Window created successfully');
 }
 
-app.whenReady().then(() => { ensureDirs(); createWindow(); });
+app.whenReady().then(() => {
+  ensureDataDirs(getDataRoot());
+  ensureDBInitialized(getDataRoot());
+  createWindow();
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
 ipcMain.handle('entries:list', () => readJSON());
 ipcMain.handle('entries:save', (e, entries) => { writeJSON(entries); return {ok:true}; });
-ipcMain.handle('media:saveDataURL', (e,{dataUrl,filenameBase})=>{
+ipcMain.handle('media:saveDataURL', (e, { dataUrl, filenameBase }) => {
   try {
-    const base = app.getPath('userData'); 
-    const mediaDir=path.join(base,'media');
-    const [meta,b64]=String(dataUrl).split(','); 
-    const extMatch=/data:image\/(png|jpeg|jpg|webp)/.exec(meta||'');
-    const ext=extMatch?(extMatch[1]==='jpeg'?'jpg':extMatch[1]):'png';
-    const file=`${filenameBase}.${ext}`;
-    const fullPath = path.join(mediaDir,file);
-    fs.writeFileSync(fullPath, Buffer.from(b64,'base64'));
-    return {ok:true, path: `file://${fullPath}`};
+    const root = getDataRoot();
+    const mediaDir = path.join(root, 'media');
+    const [meta, b64] = String(dataUrl).split(',');
+    const extMatch = /data:image\/(png|jpeg|jpg|webp)/.exec(meta || '');
+    const ext = extMatch ? (extMatch[1] === 'jpeg' ? 'jpg' : extMatch[1]) : 'png';
+    const file = `${filenameBase}.${ext}`;
+    fs.writeFileSync(path.join(mediaDir, file), Buffer.from(b64, 'base64'));
+    return { ok: true, path: `media/${file}` };
   } catch (error) {
     console.error('Save media error:', error);
-    return {ok:false, error: error.message};
+    return { ok: false, error: error.message };
   }
 });
 ipcMain.handle('open:userData',()=>{const p=app.getPath('userData'); shell.openPath(p); return{ok:true,path:p};});
 
-// 解析媒体文件路径
+// 解析媒体文件路径（白名单 media/）
 ipcMain.handle('resolve:mediaURL', (e, relPath) => {
   try {
-    const base = app.getPath('userData');
-    const fullPath = path.join(base, relPath);
-    if (fs.existsSync(fullPath)) {
-      return { ok: true, url: `file://${fullPath}` };
+    if (!/^media\//.test(relPath)) {
+      throw new Error('Invalid media path');
     }
-    return { ok: false, error: 'File not found' };
+    const abs = path.join(getDataRoot(), relPath);
+    return { ok: true, url: new URL(`file://${abs}`).toString() };
   } catch (error) {
     return { ok: false, error: error.message };
   }
@@ -131,6 +130,30 @@ ipcMain.handle('import:json', () => {
       return { ok: true, data: parsed };
     }
     return { ok: false, error: 'Cancelled' };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
+
+// 设置相关 IPC
+ipcMain.handle('settings:get', () => ({ dataRoot: getDataRoot() }));
+
+ipcMain.handle('dialog:chooseDir', async () => {
+  try {
+    const res = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+    if (res.canceled || !res.filePaths?.[0]) return { ok: false };
+    return { ok: true, path: res.filePaths[0] };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
+
+ipcMain.handle('settings:setDataRoot', (e, root) => {
+  try {
+    ensureDataDirs(root);
+    ensureDBInitialized(root);
+    setDataRoot(root);
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: error.message };
   }

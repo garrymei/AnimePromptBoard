@@ -3,6 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'self';
+                   script-src 'self' 'unsafe-inline';
+                   img-src 'self' data: file:;
+                   style-src 'self' 'unsafe-inline';">
     <title>Anime Prompt Board</title>
     <style>
         * {
@@ -770,6 +775,11 @@
                 <button class="btn btn-secondary" onclick="openDataDir()">
                     📂 数据目录
                 </button>
+                <button class="btn btn-secondary" id="btn-choose-root">选择数据目录</button>
+            </div>
+            
+            <div class="toolbar-section">
+                <span id="current-root" class="muted" style="font-size: 12px; color: #6c757d;"></span>
             </div>
         </div>
 
@@ -1005,7 +1015,7 @@ digital art, illustration, masterpiece
             }
 
             // 检查所需的API方法
-            const requiredMethods = ['listEntries', 'saveEntries', 'saveMediaDataURL', 'resolveMediaURL', 'openUserData', 'exportJSON', 'importJSON'];
+            const requiredMethods = ['listEntries', 'saveEntries', 'saveMediaDataURL', 'resolveMediaURL', 'openUserData', 'exportJSON', 'importJSON', 'getSettings', 'chooseDir', 'setDataRoot'];
             const missingMethods = requiredMethods.filter(method => typeof window.api[method] !== 'function');
             
             if (missingMethods.length > 0) {
@@ -1017,6 +1027,7 @@ digital art, illustration, masterpiece
             console.log('API check passed, setting up event listeners...');
             setupEventListeners();
             loadEntries();
+            refreshRoot();
         });
 
         function setupEventListeners() {
@@ -1074,6 +1085,12 @@ digital art, illustration, masterpiece
                         addUploadTag();
                     }
                 });
+            }
+
+            // 数据目录选择按钮
+            const btnChooseRoot = document.getElementById('btn-choose-root');
+            if (btnChooseRoot) {
+                btnChooseRoot.addEventListener('click', chooseDataRoot);
             }
         }
 
@@ -1543,7 +1560,7 @@ digital art, illustration, masterpiece
                 // 保存到文件并更新显示
                 await saveEntries();
                 filteredEntries = [...entries];  // 重要：同步过滤数组
-                updateDisplay();
+                await updateDisplay();
                 closeUploadModal();
                 clearUploadForm();
                 showMessage(`成功导入 ${selectedFiles.length} 个条目！`);
@@ -1604,10 +1621,23 @@ digital art, illustration, masterpiece
                                     en: entry.prompts[category],
                                     zh: ''
                                 };
-                            } else if (!entry.prompts[category].zh) {
-                                // 确保zh字段存在
+                            } else if (entry.prompts[category] && !entry.prompts[category].zh) {
+                                // 确保zh字段存在，但不覆盖已有的en字段
                                 entry.prompts[category].zh = '';
                             }
+                        });
+                        
+                        // 确保所有必需的类别都存在
+                        Object.keys(categoryMapping).forEach(key => {
+                            if (!entry.prompts[key]) {
+                                entry.prompts[key] = { en: '', zh: '' };
+                            }
+                        });
+                    } else {
+                        // 如果没有prompts字段，初始化为空结构
+                        entry.prompts = {};
+                        Object.keys(categoryMapping).forEach(key => {
+                            entry.prompts[key] = { en: '', zh: '' };
                         });
                     }
                 });
@@ -1617,12 +1647,12 @@ digital art, illustration, masterpiece
                 console.log('Set entries:', entries.length);
                 console.log('Set filteredEntries:', filteredEntries.length);
                 
-                updateDisplay();
+                await updateDisplay();
             } catch (error) {
                 console.error('Failed to load entries:', error);
                 entries = [];
                 filteredEntries = [];
-                updateDisplay();
+                await updateDisplay();
             }
         }
 
@@ -1635,9 +1665,9 @@ digital art, illustration, masterpiece
         }
 
         // 显示更新
-        function updateDisplay() {
+        async function updateDisplay() {
             updateStats();
-            updateGalleryGrid();
+            await updateGalleryGrid();
             updatePagination();
         }
 
@@ -1649,7 +1679,7 @@ digital art, illustration, masterpiece
             document.getElementById('pageInfo').textContent = `第 ${currentPage} 页，共 ${totalPages} 页`;
         }
 
-        function updateGalleryGrid() {
+        async function updateGalleryGrid() {
             const grid = document.getElementById('galleryGrid');
             const emptyState = document.getElementById('emptyState');
             
@@ -1666,20 +1696,26 @@ digital art, illustration, masterpiece
             const endIndex = startIndex + itemsPerPage;
             const pageEntries = filteredEntries.slice(startIndex, endIndex);
             
-            grid.innerHTML = pageEntries.map(entry => `
-                <div class="gallery-card" onclick="showDetailModal('${entry.id}')">
-                    <div class="gallery-image-container">
-                        <img class="gallery-image" src="${resolveImagePath(entry.imagePath)}" alt="${escapeHtml(entry.title)}" />
-                    </div>
-                    <div class="gallery-overlay">
-                        <div class="gallery-title">${escapeHtml(entry.title)}</div>
-                        <div class="gallery-tags">
-                            ${entry.tags.slice(0, 3).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}
-                            ${entry.tags.length > 3 ? `<span class="tag-chip">+${entry.tags.length - 3}</span>` : ''}
+            // 异步解析图片路径
+            const cardsHTML = await Promise.all(pageEntries.map(async entry => {
+                const imageSrc = await resolveImagePath(entry.imagePath);
+                return `
+                    <div class="gallery-card" onclick="showDetailModal('${entry.id}')">
+                        <div class="gallery-image-container">
+                            <img class="gallery-image" src="${imageSrc}" alt="${escapeHtml(entry.title)}" />
+                        </div>
+                        <div class="gallery-overlay">
+                            <div class="gallery-title">${escapeHtml(entry.title)}</div>
+                            <div class="gallery-tags">
+                                ${entry.tags.slice(0, 3).map(tag => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join('')}
+                                ${entry.tags.length > 3 ? `<span class="tag-chip">+${entry.tags.length - 3}</span>` : ''}
+                            </div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }));
+            
+            grid.innerHTML = cardsHTML.join('');
         }
 
         function updatePagination() {
@@ -1715,13 +1751,13 @@ digital art, illustration, masterpiece
             pagination.innerHTML = html;
         }
 
-        function goToPage(page) {
+        async function goToPage(page) {
             currentPage = page;
-            updateDisplay();
+            await updateDisplay();
         }
 
         // 搜索功能
-        function performSearch() {
+        async function performSearch() {
             const query = document.getElementById('searchInput').value.trim().toLowerCase();
             
             if (!query) {
@@ -1747,7 +1783,7 @@ digital art, illustration, masterpiece
             }
             
             currentPage = 1;
-            updateDisplay();
+            await updateDisplay();
         }
 
         // 模态框管理
@@ -1760,14 +1796,15 @@ digital art, illustration, masterpiece
             clearUploadForm();
         }
 
-        function showDetailModal(entryId) {
+        async function showDetailModal(entryId) {
             const entry = entries.find(e => e.id == entryId);
             if (!entry) return;
             
             currentEditingEntry = entry;
             
             // 设置图片和基本信息
-            document.getElementById('detailImage').src = resolveImagePath(entry.imagePath);
+            const imageSrc = await resolveImagePath(entry.imagePath);
+            document.getElementById('detailImage').src = imageSrc;
             document.getElementById('detailTitleInput').value = entry.title;
             document.getElementById('detailDate').textContent = new Date(entry.createdAt).toLocaleDateString();
             document.getElementById('detailTagCount').textContent = entry.tags.length;
@@ -1806,9 +1843,13 @@ digital art, illustration, masterpiece
         function updateDetailCategories() {
             if (!currentEditingEntry) return;
             
+            console.log('Updating detail categories for entry:', currentEditingEntry);
+            console.log('Entry prompts:', currentEditingEntry.prompts);
+            
             const container = document.getElementById('categoryAccordion');
             container.innerHTML = Object.entries(categoryMapping).map(([key, mapping]) => {
                 const prompt = currentEditingEntry.prompts[key] || { en: '', zh: '' };
+                console.log(`Category ${key}:`, prompt);
                 return `
                     <div class="category-item">
                         <div class="category-header" onclick="toggleCategory('${key}')">
@@ -1922,7 +1963,7 @@ digital art, illustration, masterpiece
         }
 
         // 保存和删除
-        function saveEntry() {
+        async function saveEntry() {
             if (!currentEditingEntry) return;
             
             // 更新标题
@@ -1941,19 +1982,19 @@ digital art, illustration, masterpiece
             
             filteredEntries = [...entries];  // 重要：同步过滤数组
             saveEntries();
-            updateDisplay();
+            await updateDisplay();
             closeDetailModal();
             showMessage('条目已保存！');
         }
 
-        function deleteEntry() {
+        async function deleteEntry() {
             if (!currentEditingEntry) return;
             
             if (confirm('确定要删除这个条目吗？此操作不可撤销。')) {
                 entries = entries.filter(e => e.id !== currentEditingEntry.id);
                 filteredEntries = [...entries];  // 重要：同步过滤数组
                 saveEntries();
-                updateDisplay();
+                await updateDisplay();
                 closeDetailModal();
                 showMessage('条目已删除！');
             }
@@ -1999,7 +2040,7 @@ digital art, illustration, masterpiece
                         
                         filteredEntries = [...entries];  // 重要：同步过滤数组
                         await saveEntries();
-                        updateDisplay();
+                        await updateDisplay();
                         showMessage(`成功导入 ${entries.length} 个条目！`);
                     }
                 } else {
@@ -2021,6 +2062,7 @@ digital art, illustration, masterpiece
         }
 
         async function addSampleData() {
+            console.log('Adding sample data...');
             const sampleEntries = [
                 {
                     id: Date.now() + 1,
@@ -2028,13 +2070,13 @@ digital art, illustration, masterpiece
                     imagePath: createPlaceholderImage("Sample Image 1"),
                     prompts: {
                         base_styles: { en: "anime, 1girl, beautiful, detailed", zh: "动漫风格，一个女孩，美丽，细致" },
-                        art_styles: { en: "digital art, illustration, masterpiece", zh: "数字艺术，插画，杰作" },
-                        cinematography: { en: "close-up, portrait, centered", zh: "特写，肖像，居中" },
-                        lighting: { en: "soft lighting, warm colors", zh: "柔和光线，暖色调" },
-                        themes: { en: "cute, kawaii, cheerful", zh: "可爱，萌系，开朗" },
+                        artistic_styles: { en: "digital art, illustration, masterpiece", zh: "数字艺术，插画，杰作" },
+                        cinematic: { en: "close-up, portrait, centered", zh: "特写，肖像，居中" },
+                        lighting_mood: { en: "soft lighting, warm colors", zh: "柔和光线，暖色调" },
+                        theme_styles: { en: "cute, kawaii, cheerful", zh: "可爱，萌系，开朗" },
                         rendering: { en: "high quality, 4k, detailed", zh: "高质量，4K，细致" },
                         effects: { en: "depth of field, bokeh", zh: "景深，散景" },
-                        overlays: { en: "lens flare, sparkles", zh: "镜头光晕，闪烁" }
+                        typography: { en: "lens flare, sparkles", zh: "镜头光晕，闪烁" }
                     },
                     tags: ["动漫", "女孩", "可爱", "肖像"],
                     createdAt: new Date().toISOString()
@@ -2045,31 +2087,51 @@ digital art, illustration, masterpiece
                     imagePath: createPlaceholderImage("Sample Image 2"),
                     prompts: {
                         base_styles: { en: "landscape, nature, scenic", zh: "风景，自然，风光" },
-                        art_styles: { en: "concept art, digital painting", zh: "概念艺术，数字绘画" },
-                        cinematography: { en: "wide shot, panoramic", zh: "全景，宽幅" },
-                        lighting: { en: "golden hour, sunset", zh: "黄金时间，日落" },
-                        themes: { en: "peaceful, serene, fantasy", zh: "宁静，安详，奇幻" },
+                        artistic_styles: { en: "concept art, digital painting", zh: "概念艺术，数字绘画" },
+                        cinematic: { en: "wide shot, panoramic", zh: "全景，宽幅" },
+                        lighting_mood: { en: "golden hour, sunset", zh: "黄金时间，日落" },
+                        theme_styles: { en: "peaceful, serene, fantasy", zh: "宁静，安详，奇幻" },
                         rendering: { en: "photorealistic, detailed", zh: "照片级，细致" },
                         effects: { en: "atmospheric, misty", zh: "大气感，薄雾" },
-                        overlays: { en: "light rays, clouds", zh: "光线，云彩" }
+                        typography: { en: "light rays, clouds", zh: "光线，云彩" }
                     },
                     tags: ["风景", "自然", "奇幻", "插画"],
                     createdAt: new Date().toISOString()
                 }
             ];
 
+            console.log('Sample entries created:', sampleEntries);
+            console.log('First sample entry prompts:', sampleEntries[0].prompts);
+            
             entries.push(...sampleEntries);
             filteredEntries = [...entries];  // 重要：同步过滤数组
+            
+            console.log('Total entries after adding samples:', entries.length);
+            console.log('Last entry prompts after push:', entries[entries.length - 1].prompts);
+            
             await saveEntries();
-            updateDisplay();
+            await updateDisplay();
             showMessage('示例数据已添加！');
         }
 
         // 工具函数
-        function resolveImagePath(imagePath) {
+        async function resolveImagePath(imagePath) {
             if (imagePath.startsWith('file://') || imagePath.startsWith('data:') || imagePath.startsWith('http')) {
                 return imagePath;
             }
+            
+            // 如果是相对路径（如 media/xxx.png），需要通过 API 解析为绝对路径
+            if (imagePath.startsWith('media/')) {
+                try {
+                    const result = await window.api.resolveMediaURL(imagePath);
+                    if (result.ok) {
+                        return result.url;
+                    }
+                } catch (error) {
+                    console.error('Failed to resolve media path:', error);
+                }
+            }
+            
             return imagePath;
         }
 
@@ -2161,6 +2223,36 @@ calligraphic kanji overlay, dissolving brushstroke text, flowing mist captions`;
 
         // 在控制台暴露测试函数
         window.testTemplateParsingInConsole = testTemplateParsingInConsole;
+
+        // 数据目录管理功能
+        async function refreshRoot() {
+            try {
+                const s = await window.api.getSettings();
+                document.getElementById('current-root').textContent =
+                    s?.dataRoot ? `📂 数据目录：${s.dataRoot}` : '📂 数据目录：默认（userData）';
+            } catch (error) {
+                console.error('获取设置失败:', error);
+                document.getElementById('current-root').textContent = '📂 数据目录：获取失败';
+            }
+        }
+
+        async function chooseDataRoot() {
+            try {
+                const pick = await window.api.chooseDir();
+                if (!pick.ok) return;
+                
+                const result = await window.api.setDataRoot(pick.path);
+                if (result.ok) {
+                    alert('数据目录已更新！后续新增/保存都会写入该目录。建议重启应用。');
+                    refreshRoot();
+                } else {
+                    showMessage(`设置数据目录失败: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('选择数据目录失败:', error);
+                showMessage('选择数据目录失败，请检查控制台错误信息');
+            }
+        }
 
         // AI提示词专用翻译词典
         const aiPromptTranslations = {

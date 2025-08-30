@@ -11,7 +11,12 @@ try {
     resolveMediaURL: (relPath) => ipcRenderer.invoke('resolve:mediaURL', relPath),
     openUserData: () => ipcRenderer.invoke('open:userData'),
     exportJSON: (data) => ipcRenderer.invoke('export:json', data),
-    importJSON: () => ipcRenderer.invoke('import:json')
+    importJSON: () => ipcRenderer.invoke('import:json'),
+    
+    // 设置相关 API
+    getSettings: () => ipcRenderer.invoke('settings:get'),
+    chooseDir: () => ipcRenderer.invoke('dialog:chooseDir'),
+    setDataRoot: (p) => ipcRenderer.invoke('settings:setDataRoot', p)
   });
   console.log('API exposed successfully!');
 } catch (error) {
