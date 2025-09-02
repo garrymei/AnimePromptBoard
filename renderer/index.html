@@ -762,6 +762,16 @@
                     <span id="pageInfo">第 1 页，共 1 页</span>
                 </div>
             </div>
+            <div class="stats-right">
+                <div class="bulk-actions" id="bulkActions" style="display: none;">
+                    <span class="selected-info">已选择 <span id="selectedCount">0</span> 项</span>
+                    <button class="btn btn-secondary" onclick="deselectAllEntries()">取消全选</button>
+                    <button class="btn btn-danger" onclick="deleteBulkEntries()">🗑️ 批量删除</button>
+                </div>
+                <div class="selection-actions">
+                    <button class="btn btn-outline" onclick="selectAllEntries()">全选</button>
+                </div>
+            </div>
         </div>
 
         <!-- Gallery Grid -->

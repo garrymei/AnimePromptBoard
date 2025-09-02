@@ -18,9 +18,16 @@ import { categoryMapping } from '../logic/parser.js';
  */
 export function createGalleryCard(entry, imageSrc) {
   return `
-    <div class="gallery-card" onclick="showDetailModal('${entry.id}')">
-      <div class="gallery-image-container">
+    <div class="gallery-card" data-entry-id="${entry.id}">
+      <div class="card-selection">
+        <input type="checkbox" class="entry-checkbox" id="checkbox-${entry.id}" data-entry-id="${entry.id}" onchange="toggleEntrySelection('${entry.id}')">
+        <label for="checkbox-${entry.id}" class="checkbox-label">选择</label>
+      </div>
+      <div class="gallery-image-container" onclick="showDetailModal('${entry.id}')">
         <img class="gallery-image" src="${imageSrc}" alt="${escapeHtml(entry.title)}" loading="lazy" />
+      </div>
+      <div class="card-actions">
+        <button class="delete-btn" onclick="deleteSingleEntry('${entry.id}')" title="删除此条目">🗑️</button>
       </div>
     </div>
   `;
