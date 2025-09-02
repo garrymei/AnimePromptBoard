@@ -225,6 +225,22 @@
             transform: scale(1.02);
         }
 
+        /* Gallery Actions */
+        .gallery-actions {
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            justify-content: center;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
         /* 简化列表卡片，移除overlay，只显示图片 */
 
         /* Empty State */
@@ -1834,9 +1850,13 @@ digital art, illustration, masterpiece
                 const thumbPath = entry.thumbnailPath || entry.imagePath;
                 const imageSrc = await resolveImagePath(thumbPath);
                 return `
-                    <div class="gallery-card" onclick="showDetailModal('${entry.id}')">
-                        <div class="gallery-image-container">
+                    <div class="gallery-card">
+                        <div class="gallery-image-container" onclick="showDetailModal('${entry.id}')">
                             <img class="gallery-image" src="${imageSrc}" alt="${escapeHtml(entry.title)}" loading="lazy" />
+                        </div>
+                        <div class="gallery-actions">
+                            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); showDetailModal('${entry.id}')" title="编辑">✏️ 编辑</button>
+                            <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteEntryFromList('${entry.id}')" title="删除">🗑️ 删除</button>
                         </div>
                     </div>
                 `;
@@ -2133,6 +2153,18 @@ digital art, illustration, masterpiece
                 saveEntriesDebounced();
                 await updateDisplay();
                 closeDetailModal();
+                showMessage('条目已删除！');
+            }
+        }
+
+        async function deleteEntryFromList(entryId) {
+            event.stopPropagation(); // 阻止事件冒泡到卡片点击
+            
+            if (confirm('确定要删除这个条目吗？此操作不可撤销。')) {
+                entries = entries.filter(e => e.id != entryId);
+                filteredEntries = [...entries];  // 重要：同步过滤数组
+                saveEntriesDebounced();
+                await updateDisplay();
                 showMessage('条目已删除！');
             }
         }
